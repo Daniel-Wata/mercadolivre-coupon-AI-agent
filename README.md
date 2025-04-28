@@ -1,13 +1,14 @@
 # Mercado Livre Wishlist & Coupon Listener Bot
 
-A Telegram bot that listens for Mercado Livre product URLs, stores them in a PostgreSQL database. The bot allows you to manage your wishlist with simple commands and includes an intelligent agent that evaluates sales opportunities based on a group of sales messages.
+A Telegram bot that listens for Mercado Livre product URLs, stores them in a PostgreSQL database. 
+The bot allows you to manage your wishlist with simple commands and includes an intelligent agent that evaluates sales opportunities based on a group of sales messages.
 
 ## Features
 
 - Automatically detects and saves Mercado Livre product URLs shared in a Telegram group
 - Extracts product title and price information
 - Provides commands to list and delete wishlist items
-- Intelligent sales agent that evaluates coupons based on a group of sales messages and applies them to the user's wishlist, looking for best discount percentage
+- Intelligent sales agent that evaluates coupons based on a group of sales messages and applies them to the user's wishlist, looking for best discount percentage.
 - Stores data in a PostgreSQL database running in Docker
 
 ## Screenshots
@@ -76,7 +77,7 @@ The project includes an intelligent agent powered by Groq's language models that
 
 ### How the agent runs
 
-The agent runs through a workflow defined by a graph of nodes and edges. Each node represents a specific task, and the edges determine the flow between tasks. Here's a visual representation of the workflow:
+The agent is a laggraph application thatruns through a workflow defined by a graph of nodes and edges. Each node represents a specific task, and the edges determine the flow between tasks. Here's a visual representation of the workflow:
 
 ![Workflow Graph](agent/workflow_graph.png)
 
@@ -85,12 +86,12 @@ The workflow follows these steps:
 When a new message is received in the sales group:
 
 1. Gets wishlist items from database
-2. Checks if the message contains a Mercado Livre sale
-3. Extracts any coupons from the message
+2. Checks if the message contains a Mercado Livre coupon if there are items in the wishlist
+3. Uses a LLM to extract any coupons from the message, along with it's data and use conditions
 4. Filters out previously seen coupons
-5. In parallel:
+5. If there are new coupons, in parallel:
    - Saves new coupons to database
-   - Optimizes cart by applying coupons to wishlist items
+   - Optimizes cart by applying coupons to wishlist items and uses AI to craft a message with the best deals found
 6. Crafts a message with the best deals found
 
 
