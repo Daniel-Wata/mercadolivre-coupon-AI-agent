@@ -82,6 +82,8 @@ The agent runs through a workflow defined by a graph of nodes and edges. Each no
 
 The workflow follows these steps:
 
+When a new message is received in the sales group:
+
 1. Gets wishlist items from database
 2. Checks if the message contains a Mercado Livre sale
 3. Extracts any coupons from the message
