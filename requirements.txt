@@ -1,0 +1,6 @@
+telethon
+psycopg2
+asyncpg
+aiohttp
+beautifulsoup4
+python-telegram-bot

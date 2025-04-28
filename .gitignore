@@ -1,0 +1,5 @@
+.env
+.venv
+__pycache__
+telegram_bots/sessions/*
+agent/sales_evaluation_agent.ipynb
