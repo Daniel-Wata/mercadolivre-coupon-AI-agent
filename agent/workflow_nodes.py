@@ -215,8 +215,6 @@ def insert_coupons_in_database(state):
                 conn.commit()
     except Exception as e:
         print(f"Error inserting coupons into database: {e}")
-    
-    return state
 
 def continue_or_end(state) -> Literal["continue", "end"]:
     """
@@ -298,6 +296,7 @@ def optimise_cart(state):
     
     # Track best configuration for maximum percentage discount
     best_percentage = Decimal("0")
+    best_absolute_saving = Decimal("0")
     best_carts = []
     
     # For each coupon, try all possible item combinations
@@ -319,6 +318,21 @@ def optimise_cart(state):
                 # If this gives a better percentage discount, update our best plan
                 if save_percentage > best_percentage:
                     best_percentage = save_percentage
+                    best_absolute_saving = save
+                    
+                    cart = {
+                        "coupon": coupon["code"],
+                        "items": [wishlist[i] for i in combo],
+                        "subtotal": float(subtotal),
+                        "saving": float(save),
+                        "saving_percentage": float(save_percentage)
+                    }
+                    
+                    best_carts = [cart]  # Just keep the single best cart
+                
+                # If percentage is the same, use absolute discount as tiebreaker
+                elif save_percentage == best_percentage and save > best_absolute_saving:
+                    best_absolute_saving = save
                     
                     cart = {
                         "coupon": coupon["code"],
@@ -349,7 +363,8 @@ def craft_deal_message(state):
     to the products in their wish-list, maximising total savings, by sending him a message in TELEGRAM.
 
     • List only the *new* coupons (state["coupons"]) and explain, in one line
-      each, the essential rule (e.g. "20 % off até R$ 50, compra mínima R$ 49").
+      each, the essential rule (e.g. "20 % off até R$ 50, compra mínima R$ 49"). 
+      **Important** Note that every percentual coupon should have a max discount and a minimun purchase. If not, express this concern in the message, that the coupons should be validated.
     • Then describe the recommended cart split from state["best_plan"]:
          – for each cart, say 
           - which coupon to use,

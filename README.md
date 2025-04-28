@@ -34,6 +34,7 @@ The bot allows you to manage your wishlist with simple commands and includes an 
 
 ### Coupon received and applied to wishlist by the agent
 
+![Coupon received and applied to wishlist by the agent](screenshots/coupon_message.png)
 
 ## Requirements
 

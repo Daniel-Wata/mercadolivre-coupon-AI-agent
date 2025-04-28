@@ -24,7 +24,7 @@ bot_token = os.getenv("TELEGRAM_BOT_TOKEN")  # Add your bot token to .env file
 SALES_GROUP = os.getenv("SALES_GROUP")
 TEST_SALES_GROUP = os.getenv("TEST_SALES_GROUP")
 
-test = False
+test = True
 if test:
     SALES_GROUP = TEST_SALES_GROUP
 
