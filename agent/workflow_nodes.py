@@ -118,22 +118,30 @@ def direct_compare_deal_message(state):
     **Important**: If there is no match, return "no match"
 
     The sale information should include:
-    - The product name
+    - The product name and sale url fromatted as [product name](sale url)
     - The sale price
     - How to activate the sale
 
     The product in the cart it is similar to should include:
-    - The product name
-    - The product URL
-    - The product price
-    - The product discount
-    - The product discount percentage
-    - The product discount URL
+    - The product name and price from the wishlist
 
     Keep it in a light tone, not too formal. The message must be in brazilian portuguese.
 
     The message should be formatted in Markdown. with proper line breaks and lists.
     REMEMBER: If there is no match, return "no match"
+
+    Example when there is a match:
+        **Promocao de produto similar a sua lista:**
+        • [product name](sale url) - R$ 100,00
+
+        **Como ativar a promocao:**
+        • Utilize o cupom: `VALE20` no site
+
+        **Essa promocao e simliar ao produto:**
+        ID: Product name from wishlist - R$ 100,00
+
+        Short message on what are the similarities and differences between the product in the sale and the product in the wishlist
+
     wishlist: {json.dumps(wishlist_for_json)}
     """
 

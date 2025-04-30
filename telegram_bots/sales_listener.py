@@ -126,7 +126,7 @@ async def main():
         print(data)
         print(data.get('deal_message'))
         # Send deal message to the wishlist group if one was generated
-        if data.get('deal_message') and (data.get('deal_message') != "no match"):
+        if data.get('deal_message') and "no match" not in data.get('deal_message').lower():
             try:
                 # Use the negative chat ID
                 await client_sender.send_message(WISHLIST_GROUP_ID, data['deal_message'], parse_mode="Markdown")
