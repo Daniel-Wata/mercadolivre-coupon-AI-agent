@@ -43,6 +43,13 @@ class State(TypedDict):
     should_continue: bool
     best_plan: Dict[str, Any]
     deal_message: str
+    direct_compare: bool
+
+class directCompareState(TypedDict):
+    message: str
+    wishlist: List[WishlistItem]
+    should_continue: bool
+    deal_message: str
 
 def test_urls(message: str) -> bool:
     """
@@ -57,7 +64,7 @@ def test_urls(message: str) -> bool:
     for url in urls:
         print(f"Checking URL: {url}")
         try:
-            response = requests.get(url)
+            response = requests.get(url, timeout=5, allow_redirects=True, headers={'User-Agent': 'Mozilla/5.0'})
             if response.status_code == 200:
                 # Get the final URL after redirects
                 final_url = response.url
@@ -68,6 +75,77 @@ def test_urls(message: str) -> bool:
             print(f"Error calling URL: {url}")
             print(e)
     return return_urls
+
+def coupon_or_direct_compare(state) -> Literal["coupon", "direct_compare", "end"]:
+    """
+    Return "continue" if we should keep going,
+    or "end" to stop the run immediately.
+    """
+    if state['should_continue'] == False:
+        print("Decided to end")
+        return "end"
+    elif state['direct_compare']:
+        print("Decided to direct compare")
+        return "direct_compare"
+    else:
+        print("Decided to go with coupon workflow")
+        return "coupon"
+
+def decimal_to_float(obj):
+    """Convert Decimal objects to float for JSON serialization"""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {k: decimal_to_float(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [decimal_to_float(item) for item in obj]
+    return obj
+
+def direct_compare_deal_message(state):
+    """
+    Verifies if the message has a sale for a product in the wishlist
+    """
+    print("Checking if the message has a sale for a product in the wishlist")
+    message = state['message']
+    
+    # Convert any Decimal objects to float for JSON serialization
+    wishlist_for_json = decimal_to_float(state['wishlist'])
+    
+    llm_prompt = f"""
+    You are a shopping assistant that sends messages to a group in telegram.
+    You will be given a message from a sales group and a wishlist from the user. Your job is to determine if there is a sale for a similar product in the wishlist.
+    If there is a sale for a similar product, you will need to return the sale information and the product in the cart it is similar to.
+    **Important**: If there is no match, return "no match"
+
+    The sale information should include:
+    - The product name
+    - The sale price
+    - How to activate the sale
+
+    The product in the cart it is similar to should include:
+    - The product name
+    - The product URL
+    - The product price
+    - The product discount
+    - The product discount percentage
+    - The product discount URL
+
+    Keep it in a light tone, not too formal. The message must be in brazilian portuguese.
+
+    The message should be formatted in Markdown. with proper line breaks and lists.
+    REMEMBER: If there is no match, return "no match"
+    wishlist: {json.dumps(wishlist_for_json)}
+    """
+
+    message = f"""
+    Message: {message}
+    """
+
+    response = llm.invoke([SystemMessage(content=llm_prompt), HumanMessage(content=message)])
+    print(response.content)
+    state['deal_message'] = response.content
+    return state
+
 
 def is_it_a_mercadolivre_sale(state):
     """
@@ -86,10 +164,10 @@ def is_it_a_mercadolivre_sale(state):
     for url in urls:
         if "mercadolivre" in url.lower() or "mercado livre" in url.lower():
             print("Found Mercado Livre in URL")
-            state['should_continue'] = True
+            state['direct_compare'] = False
             return state
     print("No Mercado Livre found")
-    state['should_continue'] = False
+    state['direct_compare'] = True
     return state
 
 def coupon_extraction_from_message(message: str):
@@ -100,7 +178,7 @@ def coupon_extraction_from_message(message: str):
     system_message = """ You are an expert in coupon lookup.
     You will be given a message and you will need to determine if there is a coupon in the message or not.
     If there is a coupon, you will need to return a list of coupon codes and their information.
-    If there is no coupon, you will need to return an empty list.
+    If there is no coupon, or there are not enough information on the coupon, you will need to return an empty list.
 
     You will also look for the coupon informations like:
         - discount_value: the value of the discount
@@ -109,13 +187,17 @@ def coupon_extraction_from_message(message: str):
         - discount_type: the type of discount (percentage, value, unknown)
         - minimun_purchase: the minimum purchase value to use the coupon
         - product_type_limit: the product type limit to use the coupon, a word or phrase that describes the product type
+        - has_rules: a boolean value to indicate if the message has the coupon rules or not
+        
     
-    In case there is no information on the coupon directly, you'll look into the item being sold and return the amount of discount for that item as value of the discount.
+    
+    The coupon should have a value, a percentage and in case of percentage, a max discount (unless stated otherwise) and a minimun purchase value (unless stated otherwise).
 
+    If there is no information on the coupon directly, mark has_rules as false.
     In the cases of non used keys, return null!
 
     Return only a JSON with the following format:
-    [{"code":"code","discount_value":50,"discount_percentage":10,"max_discount":50, "minimun_purchase":100, "product_type_limit":"moda", "discount_type":"percentage"}]
+    [{"code":"code","discount_value":50,"discount_percentage":10,"max_discount":50, "minimun_purchase":100, "product_type_limit":"moda", "discount_type":"percentage", "has_rules":true}]
     or []
 
     DO NOT RETURN ANYTHING ELSE.
@@ -160,7 +242,7 @@ def filter_viewed_coupons(state):
     """
     print("Filtering viewed coupons")
     viewed_coupons = get_viewed_coupons()
-    state['coupons'] = [coupon for coupon in state['coupons'] if coupon['code'] not in viewed_coupons]
+    state['coupons'] = [coupon for coupon in state['coupons'] if coupon['code'] not in viewed_coupons or coupon['has_rules'] == False]
 
     if len(state['coupons']) == 0:
         print("No new coupons found")
@@ -207,7 +289,7 @@ def insert_coupons_in_database(state):
     try:
         with psycopg2.connect(DATABASE_URL) as conn:
             with conn.cursor() as cur:
-                for coupon in state['coupons']:
+                for coupon in [coupon for coupon in state['coupons'] if coupon['has_rules'] == True]:
                     cur.execute("INSERT INTO coupons (code, discount_value, discount_percentage, max_discount, minimun_purchase, product_type_limit, discount_type) VALUES (%s, %s, %s, %s, %s, %s, %s)", 
                                (coupon['code'], coupon['discount_value'], coupon['discount_percentage'], 
                                 coupon['max_discount'], coupon['minimun_purchase'], 
@@ -272,8 +354,9 @@ def optimise_cart(state):
     coupons:   List[Dict[str, Any]] = state.get("coupons", [])
     wishlist:  List[Dict[str, Any]] = state.get("wishlist", [])
 
+    filtered_coupons = [coupon for coupon in coupons if coupon['has_rules'] == True]
     # 0) guard-rails ------------------------------------------------
-    if not coupons or not wishlist:
+    if not filtered_coupons or not wishlist:
         state["best_plan"] = {"total_saving": 0.0, "carts": []}
         return state                        # ← must return!
 
@@ -300,7 +383,7 @@ def optimise_cart(state):
     best_carts = []
     
     # For each coupon, try all possible item combinations
-    for coupon in coupons:
+    for coupon in filtered_coupons:
         min_purchase = Decimal(str(coupon.get("minimun_purchase") or 0))
         
         # Try all possible subsets of items (from 1 item to all items)
@@ -362,11 +445,11 @@ def craft_deal_message(state):
     The goal: help the user apply new Mercado Livre coupons
     to the products in their wish-list, maximising total savings, by sending him a message in TELEGRAM.
 
-    • List only the *new* coupons (state["coupons"]) and explain, in one line
+    • List only the coupons (state["coupons"]) and explain, in one line
       each, the essential rule (e.g. "20 % off até R$ 50, compra mínima R$ 49"). 
-      **Important** Note that every percentual coupon should have a max discount and a minimun purchase. If not, express this concern in the message, that the coupons should be validated.
+      **Important** If the coupon has no rules (has_rules is false or there is no information on the coupon), express that in the message, that no rules were found in the message fot that coupon, that if another future message explains it, we will re-send it.
     • Then describe the recommended cart split from state["best_plan"]:
-         – for each cart, say 
+         – for each cart, say: 
           - which coupon to use,
           - which items go inside (name and url), 
           - the subtotal

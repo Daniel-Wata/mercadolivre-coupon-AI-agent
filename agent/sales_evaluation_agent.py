@@ -2,10 +2,12 @@ from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, START, END
 from typing import Dict, Any
 import os
+from langchain_core.runnables.graph import CurveStyle, MermaidDrawMethod, NodeStyles
 
 # Import all node functions from the new file
 from agent.workflow_nodes import (
     is_it_a_mercadolivre_sale,
+    coupon_or_direct_compare,
     coupon_extraction,
     filter_viewed_coupons,
     get_wishlist_items,
@@ -15,7 +17,8 @@ from agent.workflow_nodes import (
     continue_or_end,
     route_after_filter,
     identity,
-    State
+    State,
+    direct_compare_deal_message
 )
 
 # Initialize the LLM for any local usage
@@ -44,10 +47,12 @@ def instantiate_workflow():
     workflow.add_node("optimise_cart", optimise_cart)
     workflow.add_node("craft_deal_message", craft_deal_message)
     workflow.add_node("insert_coupons_in_database", insert_coupons_in_database)
+    workflow.add_node("coupon_or_direct_compare", coupon_or_direct_compare)
+    workflow.add_node("direct_compare_deal_message", direct_compare_deal_message)
 
     workflow.add_edge(START, "get_wishlist_items")
     workflow.add_conditional_edges("get_wishlist_items", continue_or_end, {"continue": "is_mercadolivre_sale", "end": END})
-    workflow.add_conditional_edges("is_mercadolivre_sale", continue_or_end, {"continue": "coupon_extraction", "end": END})
+    workflow.add_conditional_edges("is_mercadolivre_sale", coupon_or_direct_compare, {"coupon": "coupon_extraction", "direct_compare": "direct_compare_deal_message", "end": END})
     workflow.add_edge("coupon_extraction", "filter_viewed_coupons")
     workflow.add_conditional_edges(
         "filter_viewed_coupons",
@@ -63,11 +68,24 @@ def instantiate_workflow():
 
     workflow.add_edge("optimise_cart", "craft_deal_message")
     workflow.add_edge("craft_deal_message", END)
+    workflow.add_edge("direct_compare_deal_message", END)
 
 
     app = workflow.compile()
-    with open("workflow_graph.png", "wb") as f:
-        f.write(app.get_graph().draw_mermaid_png())
+    #try:
+    #    with open("workflow_graph.png", "wb") as f:
+    #        f.write(app.get_graph().draw_mermaid_png(
+    #        curve_style=CurveStyle.LINEAR,
+    #        node_colors=NodeStyles(first="#ffdfba", last="#baffc9", default="#fad7de"),
+    #        wrap_label_n_words=9,
+    #        output_file_path=None,
+    #        draw_method=MermaidDrawMethod.PYPPETEER,
+    #        background_color="white",
+    #        padding=10,
+    #    ))
+    #except Exception as e:
+    #    app.get_graph().print_ascii()
+    #    print("Unable to save the graph image:",e)
     return app
 
 def run_workflow(message: str) -> Dict[str, Any]:
@@ -76,3 +94,5 @@ def run_workflow(message: str) -> Dict[str, Any]:
     data = workflow.invoke(initial_state)
     return data
 
+if __name__ == "__main__":
+    run_workflow("test")

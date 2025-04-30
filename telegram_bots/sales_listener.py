@@ -24,7 +24,7 @@ bot_token = os.getenv("TELEGRAM_BOT_TOKEN")  # Add your bot token to .env file
 SALES_GROUP = os.getenv("SALES_GROUP")
 TEST_SALES_GROUP = os.getenv("TEST_SALES_GROUP")
 
-test = True
+test = False
 if test:
     SALES_GROUP = TEST_SALES_GROUP
 
@@ -115,16 +115,18 @@ async def main():
     bot_info = await client_sender.get_me()
     print(f"Bot authenticated as: @{bot_info.username} (ID: {bot_info.id})")
     
-    @client_listener.on(events.NewMessage(chats=SALES_GROUP))
+    @client_listener.on(events.NewMessage(chats=SALES_GROUP.split(",")))
     async def sales_watcher(event):
         # Call the processing function with the message details
         process_sales_message(event.chat.title, event.message.text)
 
-        data = run_workflow(event.message.text)
+        # Process messages sequentially to avoid race conditions
+        async with asyncio.Lock():
+            data = run_workflow(event.message.text)
         print(data)
         print(data.get('deal_message'))
         # Send deal message to the wishlist group if one was generated
-        if data.get('deal_message'):
+        if data.get('deal_message') and (data.get('deal_message') != "no match"):
             try:
                 # Use the negative chat ID
                 await client_sender.send_message(WISHLIST_GROUP_ID, data['deal_message'], parse_mode="Markdown")
