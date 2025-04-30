@@ -140,6 +140,8 @@ async def main():
                     print("Fallback message sent via user account")
                 except Exception as e2:
                     print(f"Fallback also failed: {e2}")
+        else:
+            print("No message will be sent.")
     
     # Keep the script running
     print("Bot is running...")

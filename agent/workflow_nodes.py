@@ -110,13 +110,20 @@ def direct_compare_deal_message(state):
     
     # Convert any Decimal objects to float for JSON serialization
     wishlist_for_json = decimal_to_float(state['wishlist'])
+
+    wishlist_text = ""
+    for item in wishlist_for_json:
+        wishlist_text += f"- {item['title']} - R$ {item['price']}\n"
     
     llm_prompt = f"""
-    You are a shopping assistant that sends messages to a group in telegram.
+    You are sales validator that validates if the sale sent by the user is similar to the products in the wishlist.
     You will be given a message from a sales group and a wishlist from the user. Your job is to determine if there is a sale for a similar product in the wishlist.
     If there is a sale for a similar product, you will need to return the sale information and the product in the cart it is similar to.
-    **Important**: If there is no match, return "no match"
+    **Important**: If there are no EXTREMELY similar products, return "no match"
 
+    Similarity is defined by:
+    - The sale product has very similar name, or it is the same item, but differ in small details like brand, color, size.
+    
     The sale information should include:
     - The product name and sale url fromatted as [product name](sale url)
     - The sale price
@@ -125,10 +132,11 @@ def direct_compare_deal_message(state):
     The product in the cart it is similar to should include:
     - The product name and price from the wishlist
 
-    Keep it in a light tone, not too formal. The message must be in brazilian portuguese.
-
     The message should be formatted in Markdown. with proper line breaks and lists.
     REMEMBER: If there is no match, return "no match"
+
+    Example when there is no match:
+        **no match**
 
     Example when there is a match:
         **Promocao de produto similar a sua lista:**
@@ -142,7 +150,8 @@ def direct_compare_deal_message(state):
 
         Short message on what are the similarities and differences between the product in the sale and the product in the wishlist
 
-    wishlist: {json.dumps(wishlist_for_json)}
+    wishlist: 
+    {wishlist_text}
     """
 
     message = f"""
@@ -456,13 +465,13 @@ def craft_deal_message(state):
     • List only the coupons (state["coupons"]) and explain, in one line
       each, the essential rule (e.g. "20 % off até R$ 50, compra mínima R$ 49"). 
       **Important** If the coupon has no rules (has_rules is false or there is no information on the coupon), express that in the message, that no rules were found in the message fot that coupon, that if another future message explains it, we will re-send it.
-    • Then describe the recommended cart split from state["best_plan"]:
+    • Then describe the recommended cart split from state["best_plan"], if not present, ignore this section:
          – for each cart, say: 
           - which coupon to use,
           - which items go inside (name and url), 
           - the subtotal
           - how much the coupon knocks off (Value and percentage).
-    • Finish with the grand total the user saves.
+    • Finish with the grand total the user saves, if state["best_plan"] is not present, ignore this section.
     • Divide the message into 2 parts, using bullet points:
         - List only the *new* coupons (state["coupons"]) and explain, in one line
           each, the code in `code` andthe essential rule (e.g. "20 % off até R$ 50, compra mínima R$ 49").
