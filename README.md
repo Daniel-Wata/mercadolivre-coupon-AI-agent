@@ -80,7 +80,7 @@ The project includes an intelligent agent powered by Groq's language models that
 
 The agent is a laggraph application thatruns through a workflow defined by a graph of nodes and edges. Each node represents a specific task, and the edges determine the flow between tasks. Here's a visual representation of the workflow:
 
-![Workflow Graph](agent/workflow_graph.png)
+![Workflow Graph](agent/full_workflow_graph.png)
 
 The workflow follows these steps:
 
