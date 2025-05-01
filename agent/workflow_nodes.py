@@ -2,7 +2,8 @@ from langchain_groq import ChatGroq
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 import re
 import json
-from typing import Literal, List, Dict, Any, TypedDict
+import operator
+from typing import Literal, List, Dict, Any, TypedDict, Annotated
 from decimal import Decimal
 import psycopg2
 from itertools import permutations, chain, combinations
@@ -84,7 +85,7 @@ def coupon_or_direct_compare(state) -> Literal["coupon", "direct_compare", "end"
     if state['should_continue'] == False:
         print("Decided to end")
         return "end"
-    elif state['direct_compare']:
+    elif state.get('direct_compare',False):
         print("Decided to direct compare")
         return "direct_compare"
     else:
@@ -366,6 +367,32 @@ def greedy_partitions(indices, prices, coupons):
         yield current
     if remaining:
         yield list(remaining)
+
+def optimise_or_full_message(state) -> Literal["optimise_cart", "full_message", "end"]:
+    """
+    Return "optimise_cart" if we should optimise the cart (coupons and rules present),
+    or "full_message" to send the full message.
+    """
+    cupons_with_rules = [coupon for coupon in state['coupons'] if coupon['has_rules'] == True]
+    cupons_without_rules = [coupon for coupon in state['coupons'] if coupon['has_rules'] == False]
+    
+    if len(cupons_with_rules) > 0:
+        print("Optimising cart")
+        return "optimise_cart"
+    elif len(cupons_without_rules) > 0:
+        print("Sending full message")
+        return "full_message"
+    else:
+        print("No coupons found")
+        return "end"
+
+def return_full_message(state):
+    """
+    Return the full message
+    """
+    print("Sending full message")
+    state['deal_message'] = "Nao consegui definir as regras dessa mensagem, mas pode ser relevante:\n" + state['message']
+    return state
 
 def optimise_cart(state):
     coupons:   List[Dict[str, Any]] = state.get("coupons", [])

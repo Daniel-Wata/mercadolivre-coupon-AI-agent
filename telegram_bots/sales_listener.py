@@ -5,6 +5,10 @@ import os
 from dotenv import load_dotenv
 import asyncio
 import sys
+import psycopg2
+from datetime import datetime
+from sentence_transformers import SentenceTransformer
+import numpy as np
 
 # Load environment variables
 load_dotenv()
@@ -40,6 +44,128 @@ DB_PORT = os.getenv("DATABASE_PORT", "5432")
 
 # Create connection string
 DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+# Initialize the embedding model (lazy loading - will load on first use)
+embedding_model = None
+
+def get_embedding_model():
+    """Get or initialize the embedding model"""
+    global embedding_model
+    if embedding_model is None:
+        # Load the model - this will download it if not already present
+        print("Loading embedding model...")
+        embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+        print("Embedding model loaded")
+    return embedding_model
+
+def get_embedding(text):
+    """Generate embedding for the given text using MiniLM"""
+    try:
+        if not text or text.strip() == "":
+            return None
+            
+        # Truncate text if it's too long
+        if len(text) > 5000:  # Arbitrary limit to avoid memory issues
+            text = text[:5000]
+            
+        model = get_embedding_model()
+        embedding = model.encode(text)
+        
+        # Convert to list for database storage
+        return embedding.tolist()
+    except Exception as e:
+        print(f"Error generating embedding: {e}")
+        return None
+
+def get_db_connection():
+    """Create and return a database connection"""
+    conn = psycopg2.connect(
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=DB_PORT,
+        database=DB_NAME
+    )
+    return conn
+
+def store_message(chat_title, message_text, message_id, sender_id):
+    """Store the message and its embedding in the database"""
+    try:
+        # Generate embedding for the message
+        embedding = get_embedding(message_text)
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Insert the message into the telegram_messages table with embedding
+        if embedding:
+            cursor.execute(
+                """
+                INSERT INTO telegram_messages (chat_title, message_text, message_id, sender_id, embedding)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (chat_title, message_text, message_id, sender_id, embedding)
+            )
+        else:
+            # Insert without embedding if generation failed
+            cursor.execute(
+                """
+                INSERT INTO telegram_messages (chat_title, message_text, message_id, sender_id)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (chat_title, message_text, message_id, sender_id)
+            )
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print(f"Message stored in database with embedding. ID: {message_id}")
+    except Exception as e:
+        print(f"Error storing message in database: {e}")
+
+def search_similar_messages(query_text, limit=5):
+    """Search for messages similar to the query text"""
+    try:
+        # Generate embedding for the query
+        query_embedding = get_embedding(query_text)
+        if not query_embedding:
+            return []
+            
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Search for similar messages using cosine similarity
+        cursor.execute(
+            """
+            SELECT id, chat_title, message_text, 
+                   1 - (embedding <=> %s) as similarity
+            FROM telegram_messages
+            WHERE embedding IS NOT NULL
+            ORDER BY embedding <=> %s
+            LIMIT %s
+            """,
+            (query_embedding, query_embedding, limit)
+        )
+        
+        results = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        # Format results
+        similar_messages = [
+            {
+                "id": row[0],
+                "chat_title": row[1],
+                "message_text": row[2],
+                "similarity": row[3]
+            }
+            for row in results
+        ]
+        
+        return similar_messages
+    except Exception as e:
+        print(f"Error searching similar messages: {e}")
+        return []
 
 def process_sales_message(chat_title, message_text):
     """Function that processes the received sales message"""
@@ -117,6 +243,14 @@ async def main():
     
     @client_listener.on(events.NewMessage(chats=SALES_GROUP.split(",")))
     async def sales_watcher(event):
+        # Store the message in the database
+        store_message(
+            event.chat.title, 
+            event.message.text, 
+            event.message.id,
+            event.message.sender_id if event.message.sender else None
+        )
+        
         # Call the processing function with the message details
         process_sales_message(event.chat.title, event.message.text)
 

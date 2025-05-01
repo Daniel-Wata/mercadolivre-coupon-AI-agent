@@ -1,16 +1,23 @@
--- Create a table for storing telegram messages
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Create a table for storing telegram messages with embeddings
 CREATE TABLE IF NOT EXISTS telegram_messages (
     id SERIAL PRIMARY KEY,
     chat_title VARCHAR(255) NOT NULL,
     message_text TEXT NOT NULL,
     message_id BIGINT NOT NULL,
     sender_id BIGINT,
+    embedding vector(384),  -- For all-MiniLM-L6-v2 embeddings (384 dimensions)
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create index on common search fields
 CREATE INDEX IF NOT EXISTS idx_telegram_messages_chat_title ON telegram_messages(chat_title);
 CREATE INDEX IF NOT EXISTS idx_telegram_messages_timestamp ON telegram_messages(timestamp);
+
+-- Create vector index for similarity search
+CREATE INDEX IF NOT EXISTS idx_telegram_messages_embedding ON telegram_messages USING ivfflat (embedding vector_cosine_ops);
 
 -- Create a table for storing wishlist items from Mercado Livre
 CREATE TABLE IF NOT EXISTS wishlist (
