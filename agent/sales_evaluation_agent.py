@@ -77,20 +77,20 @@ def instantiate_workflow():
 
 
     app = workflow.compile()
-    try:
-        with open("workflow_graph.png", "wb") as f:
-            f.write(app.get_graph().draw_mermaid_png(
-            curve_style=CurveStyle.LINEAR,
-            node_colors=NodeStyles(first="#ffdfba", last="#baffc9", default="#fad7de"),
-            wrap_label_n_words=9,
-            output_file_path=None,
-            draw_method=MermaidDrawMethod.PYPPETEER,
-            background_color="white",
-            padding=10,
-        ))
-    except Exception as e:
-        app.get_graph().print_ascii()
-        print("Unable to save the graph image:",e)
+    #try:
+    #    with open("workflow_graph.png", "wb") as f:
+    #        f.write(app.get_graph().draw_mermaid_png(
+    #        curve_style=CurveStyle.LINEAR,
+    #        node_colors=NodeStyles(first="#ffdfba", last="#baffc9", default="#fad7de"),
+    #        wrap_label_n_words=9,
+    #        output_file_path=None,
+    #        draw_method=MermaidDrawMethod.PYPPETEER,
+    #        background_color="white",
+    #        padding=10,
+    #    ))
+    #except Exception as e:
+    #    app.get_graph().print_ascii()
+    #    print("Unable to save the graph image:",e)
     return app
 
 def run_workflow(message: str) -> Dict[str, Any]:

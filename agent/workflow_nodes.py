@@ -307,7 +307,7 @@ def insert_coupons_in_database(state):
     try:
         with psycopg2.connect(DATABASE_URL) as conn:
             with conn.cursor() as cur:
-                for coupon in [coupon for coupon in state['coupons'] if coupon['has_rules'] == True]:
+                for coupon in state['coupons']:
                     cur.execute("INSERT INTO coupons (code, discount_value, discount_percentage, max_discount, minimun_purchase, product_type_limit, discount_type) VALUES (%s, %s, %s, %s, %s, %s, %s)", 
                                (coupon['code'], coupon['discount_value'], coupon['discount_percentage'], 
                                 coupon['max_discount'], coupon['minimun_purchase'], 

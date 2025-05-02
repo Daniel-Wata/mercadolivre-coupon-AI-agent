@@ -1,6 +1,13 @@
 telethon
-psycopg2
+psycopg2-binary
 asyncpg
 aiohttp
 beautifulsoup4
 python-telegram-bot
+python-dotenv
+langchain-core
+langchain-groq
+dotenv
+langgraph
+sentence-transformers
+grandalf

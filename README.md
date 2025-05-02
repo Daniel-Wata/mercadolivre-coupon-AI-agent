@@ -88,12 +88,13 @@ When a new message is received in the sales group:
 
 1. Gets wishlist items from database
 2. Checks if the message contains a Mercado Livre coupon if there are items in the wishlist
-3. Uses a LLM to extract any coupons from the message, along with it's data and use conditions
-4. Filters out previously seen coupons
-5. If there are new coupons, in parallel:
+3. If there's at least one coupon in the message, it will follow the coupon path, otherwise it will do a comparison by title to see if the message contains an offer for an item similar to any of the items in the cart.
+4. Uses a LLM to extract any coupons from the message, along with it's data and use conditions
+5. Filters out previously seen coupons
+6. If there are new coupons, in parallel:
    - Saves new coupons to database
-   - Optimizes cart by applying coupons to wishlist items and uses AI to craft a message with the best deals found
-6. Crafts a message with the best deals found
+   - Optimizes cart by applying coupons to wishlist items and uses AI to craft a message with the best deals found OR, if there's no clear information on the coupon, it will just throw the full message to the user so he can evaluate for himself
+7. Crafts a message with the best deals found
 
 
 ### Agent Configuration
